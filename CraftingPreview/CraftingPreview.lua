@@ -9,12 +9,14 @@ local language = GetCVar("language.2")
 if language == "de" then
 	ZO_CreateStringId("SI_PREVIEW_IN_EMPTY_WORLD", "Alt. Vorschau")
 	ZO_CreateStringId("SI_CRAFTING_COLOR_SCHEME", "Farbschema: ")
+	ZO_CreateStringId("SI_CRAFTING_NO_COLOR_SCHEME", "Kein Farbschema")
 else
 	ZO_CreateStringId("SI_PREVIEW_IN_EMPTY_WORLD", "Preview in empty world")
 	ZO_CreateStringId("SI_CRAFTING_COLOR_SCHEME", "Color scheme: ")
+	ZO_CreateStringId("SI_CRAFTING_NO_COLOR_SCHEME", "No color scheme")
 end
 
-local COLORSTAMP = 1
+local COLORSTAMP = 0
 
 -- create an empty options fragment. we don't use any special options yet, but that may change in the future.
 local CRAFTING_PREVIEW_OPTIONS_FRAGMENT = ZO_ItemPreviewOptionsFragment:New({})
@@ -62,14 +64,20 @@ function ZO_ItemPreviewType_Crafting:ResetStaticParameters()
 end
 
 function ZO_ItemPreviewType_Crafting:Apply(variationIndex)
-	--d("style", self.styleIndex)
 	PreviewCraftItem(self.patternIndex, self.materialIndex, self.materialQuantity, self.styleIndex+1, self.traitIndex, self.useUniversalStyleItem, self.dyeBrushId)
 end
 
 function ZO_ItemPreview_Shared:PreviewCraftItem(dyeBrushId, patternIndex, materialIndex, materialQuantity, styleIndex, traitIndex, useUniversalStyleItem)
-	if dyeBrushId then dyeBrushId = dyeBrushId + 3 end
-	--d("start", dyeBrushId, patternIndex, materialIndex, materialQuantity, styleIndex, traitIndex)
+	if dyeBrushId then dyeBrushId = dyeBrushId + 4 end
 	self:SharedPreviewSetup(CRAFTING_PREVIEW, patternIndex, materialIndex, materialQuantity, styleIndex, traitIndex, useUniversalStyleItem, dyeBrushId)
+end
+
+function ZO_ItemPreviewType_Crafting:GetNumVariations()
+	return 0
+end
+
+function ZO_ItemPreviewType_Crafting:GetVariationName(variationIndex)
+    return GetItemLinkName("|H1:item:" .. tostring(83518 + variationIndex) .. ":0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0|h|h") --GetString(SI_CRAFTING_COLOR_SCHEME) .. variationIndex
 end
 
 ITEM_PREVIEW_KEYBOARD.previewTypeObjects[CRAFTING_PREVIEW] = ZO_ItemPreviewType_Crafting:New()
@@ -128,6 +136,15 @@ function ZO_Smithing:EnablePreview()
 	-- move the crafting tooltip so it doesn't occlude the character
 	self.creationPanel.resultTooltip:ClearAnchors()
 	self.creationPanel.resultTooltip:SetAnchor(RIGHT, GuiRoot, CENTER, -self.creationPanel.resultTooltip:GetWidth() / 2, -self.creationPanel.resultTooltip:GetHeight() / 2)
+	self.creationPanel.resultTooltip:SetMouseEnabled(true)
+	self.creationPanel.resultTooltip:SetMovable(true)
+	
+	ColorTooltip:SetParent(self.creationPanel.resultTooltip:GetParent())
+	ColorTooltip:ClearAnchors()
+	ColorTooltip:SetClampedToScreen(false)
+	ColorTooltip:SetAnchor(TOP, self.creationPanel.resultTooltip, BOTTOM, 0, 64)
+	ColorTooltip:Setup()
+	
 	VariationWindow:SetParent(self.creationPanel.resultTooltip:GetParent())
 	VariationWindow:SetAnchor(TOP, self.creationPanel.resultTooltip, BOTTOM, 0, 64)
 	VariationWindow:SetHidden(false)
@@ -138,6 +155,15 @@ function ZO_Smithing:EnablePreview()
 end
 
 function ZO_Smithing:DisablePreview()
+	d("try disable")
+	-- move the tooltip back to its correct location
+	self.creationPanel.resultTooltip:ClearAnchors()
+	self.creationPanel.resultTooltip:SetAnchor(BOTTOM, GuiRoot, BOTTOM, 0, -245)
+	-- the preview mode doesn't work with crafting weapons, so we don't need this checkbox. so hide it.
+	self.creationPanel.emptyWorldCheckbox:SetHidden(true)
+	VariationWindow:SetHidden(true)
+	ColorTooltip:SetHidden(true)
+	
 	if not self:IsPreviewing() then return end
 	d("disable")
 	STARTED_PREVIEW = false
@@ -147,12 +173,6 @@ function ZO_Smithing:DisablePreview()
 		FRAME_TARGET_CRAFTING_FRAGMENT,
 		FRAME_PLAYER_ON_SCENE_HIDDEN_FRAGMENT,
 		CRAFTING_PREVIEW_OPTIONS_FRAGMENT)
-	-- move the tooltip back to its correct location
-	self.creationPanel.resultTooltip:ClearAnchors()
-	self.creationPanel.resultTooltip:SetAnchor(BOTTOM, GuiRoot, BOTTOM, 0, -245)
-	-- the preview mode doesn't work with crafting weapons, so we don't need this checkbox. so hide it.
-	self.creationPanel.emptyWorldCheckbox:SetHidden(true)
-	VariationWindow:SetHidden(true)
 end
 
 function ZO_Smithing_Gamepad:EnablePreview()
@@ -178,11 +198,12 @@ end
 -- on the PC UI, the crafting UI will return to the previous tab.
 -- so we have to reenable the preview mode, if the we quit the crafting station while previewing
 SMITHING_SCENE:RegisterCallback("StateChange", function(oldState, newState)
-        if newState == SCENE_SHOWING then
+	d("state change", newState)
+	if newState == SCENE_SHOWING then
 		if SMITHING:IsModeValidForPreview() then
 			SMITHING:EnablePreview()
 		end
-        elseif newState == SCENE_HIDDEN then
+	elseif newState == SCENE_HIDDEN then
 		SMITHING:DisablePreview()
 	end
 end)
@@ -231,16 +252,7 @@ do
 		local pattern, material = ...
 		if material ~= lastMaterial then
 			d("hackfix")
-			if pattern == GetNumSmithingPatterns() then
-				--PreviewCraftItem(4, materialIndex, select(3,...))
-				SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, 4, material, select(3,...))
-			else
-				local patternIndex, materialIndex, materialQuantity, styleIndex, traitIndex, useUniversalStyleItem, dyeBrushId = ...
-				d("first", pattern+1, materialIndex, materialQuantity, styleIndex, traitIndex, useUniversalStyleItem, COLORSTAMP)
-				--PreviewCraftItem(pattern+1, materialIndex, materialQuantity, styleIndex, traitIndex, useUniversalStyleItem, COLORSTAMP)
-				d("second", COLORSTAMP, pattern+1, material, select(3,...))
-				SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, pattern+1, material, select(3,...))
-			end
+			SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP+1, ...)
 			lastMaterial = material
 		end
 		SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, ...)
@@ -288,11 +300,8 @@ do
 		if not SMITHING_GAMEPAD:IsPreviewing() then return end
 		local pattern, material = ...
 		if material ~= lastMaterial then
-			if pattern == GetNumSmithingPatterns() then
-				SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, 4, material, select(3,...))
-			else
-				SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, pattern+1, material, select(3,...))
-			end
+			d("hackfix")
+			SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP+1, ...)
 			lastMaterial = material
 		end
 		SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, ...)
@@ -324,19 +333,30 @@ ZO_CheckButton_SetToggleFunction(creationPanel.emptyWorldCheckbox, function()
 	SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, ITEM_PREVIEW_KEYBOARD.previewTypeObjects[CRAFTING_PREVIEW]:GetStaticParameters())
 end)
 
+function CraftingPreviewTooltip_OnInitialize(control)
+	function control:Setup()
+		if COLORSTAMP == 0 then
+			VariationWindowLabel:SetText(GetString(SI_CRAFTING_NO_COLOR_SCHEME))
+			self:SetHidden(true)
+		else
+			VariationWindowLabel:SetText("")
+			self:SetHidden(false)
+			self:ClearLines()
+			self:SetLink("|H1:item:" .. tostring(83518 + COLORSTAMP) .. ":0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0|h|h")
+		end
+	end
+end
+
 function CraftingPreview_OnInitialize(control)
-	--ZO_Spinner:New(control)
-	--self.pointsSpinner:SetMinMax(0, zo_min(numAvailablePoints + self:GetNumPendingPoints(), maxPossiblePoints))
-	--self.pointsSpinner:SetValue(self:GetNumPendingPoints() + self.pointsSpinner:GetMin())
 	VariationWindowLabel:SetText(GetString(SI_CRAFTING_COLOR_SCHEME) .. COLORSTAMP)
 	VariationWindowRightArrow:SetHandler("OnClicked", function(control)
-		COLORSTAMP = COLORSTAMP + 1
-		VariationWindowLabel:SetText(GetString(SI_CRAFTING_COLOR_SCHEME) .. COLORSTAMP)
+		COLORSTAMP = (COLORSTAMP + 1) % 1001
+		ColorTooltip:Setup()
 		SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, ITEM_PREVIEW_KEYBOARD.previewTypeObjects[CRAFTING_PREVIEW]:GetStaticParameters())
 	end)
 	VariationWindowLeftArrow:SetHandler("OnClicked", function(control)
-		COLORSTAMP = zo_max(COLORSTAMP - 1,1)
-		VariationWindowLabel:SetText(GetString(SI_CRAFTING_COLOR_SCHEME) .. COLORSTAMP)
+		COLORSTAMP = (COLORSTAMP - 1) % 1001
+		ColorTooltip:Setup()
 		SYSTEMS:GetObject("itemPreview"):PreviewCraftItem(COLORSTAMP, ITEM_PREVIEW_KEYBOARD.previewTypeObjects[CRAFTING_PREVIEW]:GetStaticParameters())
 	end)
 end

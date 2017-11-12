@@ -1,6 +1,6 @@
 ## Title: CraftingPreview
 ## Author: Shinni
-## Version: 1.7
+## Version: 1.8
 ## APIVersion: 100020 100021
 
 CraftingPreview.lua

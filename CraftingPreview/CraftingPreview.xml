@@ -1,5 +1,10 @@
 <GuiXml>
 	<Controls>
+		<Tooltip name="ColorTooltip" inherits="ZO_ItemIconTooltip">
+			<OnInitialized>
+				CraftingPreviewTooltip_OnInitialize(self)
+			</OnInitialized>
+		</Tooltip>
 		<Control name="VariationWindow" hidden="true">
 			<OnInitialized>
 				CraftingPreview_OnInitialize(self)
