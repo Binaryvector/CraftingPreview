@@ -1,7 +1,7 @@
 ## Title: CraftingPreview
 ## Author: Shinni
-## Version: 2.1
-## APIVersion: 100022 100021
+## Version: 2.2
+## APIVersion: 100023
 
 Libs/LibStub/LibStub.lua
 Libs/LibPreview/LibPreview.lua
